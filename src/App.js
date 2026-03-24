@@ -886,85 +886,140 @@ function LearnView() {
     </div>
   );
 }
-function makeChoices(qs, i) {
-  const correct = qs[i].location;
-  const wrongs = shuffle(quizPool.filter(q=>q.location!==correct)).slice(0,3).map(q=>q.location);
-  return shuffle([correct,...wrongs]);
+/* ==================== QUIZ SYSTEM (5 types, 50 questions) ==================== */
+const QTYPE = {
+  location:{icon:"📍",label:"場所",color:"#1E88E5"},
+  exercise2region:{icon:"🧘",label:"種目→部位",color:"#9B59B6"},
+  muscle2exercise:{icon:"🏋️",label:"筋肉→種目",color:"#E53935"},
+  tip:{icon:"💡",label:"知識",color:"#F57C00"},
+  classify:{icon:"📂",label:"分類",color:"#2E7D32"},
+};
+function buildQuizPool(){
+  const all=[];
+  const re=Object.entries(REGIONS);
+  const aM=re.flatMap(([,d])=>d.muscles.map(m=>({...m,region:d.label,color:d.color,light:d.light,pilates:d.pilates})));
+  const aB=re.flatMap(([,d])=>d.bones.map(b=>({...b,region:d.label,color:d.color,light:d.light})));
+  const aI=[...aM.map(m=>({...m,itype:"筋肉"})),...aB.map(b=>({...b,itype:"骨"}))];
+  const aP=re.flatMap(([,d])=>d.pilates.map(p=>({name:p,region:d.label,color:d.color,light:d.light})));
+  const rL=re.map(([,d])=>d.label);
+  // T1: 場所
+  aI.forEach(it=>{
+    const w=shuffle(aI.filter(q=>q.location!==it.location)).slice(0,3).map(q=>q.location);
+    all.push({qType:"location",question:`この${it.itype}はどこにある？`,subject:it.name,
+      correct:it.location,choices:shuffle([it.location,...w]),
+      tip:it.tip,region:it.region,color:it.color,light:it.light,badge:`${it.itype==="骨"?"🦴":"💪"} ${it.region}`});
+  });
+  // T2: 種目→部位
+  aP.forEach(ex=>{
+    const w=shuffle(rL.filter(r=>r!==ex.region)).slice(0,3);
+    all.push({qType:"exercise2region",question:"この種目で主に鍛えられる部位は？",subject:ex.name,
+      correct:ex.region,choices:shuffle([ex.region,...w]),
+      tip:`${ex.name}は「${ex.region}」の代表的なエクササイズです`,region:ex.region,color:ex.color,light:ex.light,badge:"🧘 種目"});
+  });
+  // T3: 筋肉→種目
+  aM.forEach(m=>{
+    if(!m.pilates||!m.pilates.length)return;
+    const ce=m.pilates[Math.floor(Math.random()*m.pilates.length)];
+    const oe=aP.filter(p=>p.region!==m.region).map(p=>p.name);
+    const w=shuffle(oe).slice(0,3);if(w.length<3)return;
+    all.push({qType:"muscle2exercise",question:"この筋肉を鍛えるピラティス種目は？",subject:m.name,
+      correct:ce,choices:shuffle([ce,...w]),
+      tip:m.tip,region:m.region,color:m.color,light:m.light,badge:`💪 ${m.region}`});
+  });
+  // T4: Tip知識
+  aM.forEach(m=>{
+    if(!m.tip||m.tip.length<15)return;
+    const w=shuffle(aM.filter(q=>q.name!==m.name)).slice(0,3).map(q=>q.name);
+    all.push({qType:"tip",question:m.tip,subject:"どの筋肉の説明？",
+      correct:m.name,choices:shuffle([m.name,...w]),
+      tip:`📍 ${m.location}`,region:m.region,color:m.color,light:m.light,badge:"💡 知識"});
+  });
+  // T5: 分類
+  aM.forEach(m=>{
+    const w=shuffle(aM.filter(q=>q.region!==m.region)).slice(0,3).map(q=>q.name);
+    all.push({qType:"classify",question:`「${m.region}」に属する筋肉はどれ？`,subject:m.region,
+      correct:m.name,choices:shuffle([m.name,...w]),
+      tip:`${m.name}は「${m.region}」の筋肉。📍 ${m.location}`,region:m.region,color:m.color,light:m.light,badge:"📂 分類"});
+  });
+  return all;
 }
-function QuizView() {
-  const [questions] = useState(()=>shuffle(quizPool).slice(0,15));
-  const [idx,setIdx] = useState(0);
-  const [choices,setChoices] = useState(()=>makeChoices(shuffle(quizPool).slice(0,15),0));
-  const [selected,setSelected] = useState(null);
-  const [score,setScore] = useState(0);
-  const [done,setDone] = useState(false);
-  const [answers,setAnswers] = useState([]);
-  function handleAnswer(c){
-    if(selected)return;
-    setSelected(c);
-    if(c===questions[idx].location)setScore(s=>s+1);
-    setAnswers(a=>[...a,c===questions[idx].location]);
+function selectQs(pool,n=50){
+  const ts=Object.keys(QTYPE),per=Math.floor(n/ts.length),sel=[];
+  ts.forEach(t=>sel.push(...shuffle(pool.filter(q=>q.qType===t)).slice(0,per)));
+  return shuffle(sel).slice(0,n);
+}
+function QuizView(){
+  const [fp]=useState(()=>buildQuizPool());
+  const [qs,setQs]=useState(()=>selectQs(buildQuizPool(),50));
+  const [idx,setIdx]=useState(0);
+  const [sel,setSel]=useState(null);
+  const [score,setScore]=useState(0);
+  const [done,setDone]=useState(false);
+  const [ans,setAns]=useState([]);
+  function pick(c){if(sel)return;setSel(c);const ok=c===qs[idx].correct;if(ok)setScore(s=>s+1);setAns(a=>[...a,{correct:ok,qType:qs[idx].qType}]);}
+  function next(){if(idx+1>=qs.length){setDone(true);return;}setIdx(idx+1);setSel(null);}
+  function restart(){setQs(selectQs(fp,50));setIdx(0);setSel(null);setScore(0);setDone(false);setAns([]);}
+  if(done){
+    const ts={};Object.keys(QTYPE).forEach(t=>{ts[t]={n:0,c:0};});
+    ans.forEach(a=>{ts[a.qType].n++;if(a.correct)ts[a.qType].c++;});
+    const pct=Math.round(score/qs.length*100);
+    return(<div style={{textAlign:"center",padding:20}}>
+      <div style={{fontSize:56,marginBottom:8}}>{pct>=80?"🎉":pct>=60?"😊":"💪"}</div>
+      <div style={{fontSize:22,fontWeight:"bold",marginBottom:4}}>結果：{score} / {qs.length}</div>
+      <div style={{fontSize:14,color:"#888",marginBottom:16}}>正答率 {pct}% — {pct>=80?"素晴らしい！":pct>=60?"いい調子！":"「学ぶ」で復習しよう！"}</div>
+      <div style={{textAlign:"left",background:"white",borderRadius:14,padding:14,marginBottom:16,boxShadow:"0 2px 8px rgba(0,0,0,0.08)"}}>
+        <div style={{fontWeight:"bold",fontSize:13,marginBottom:8,color:"#555"}}>📊 タイプ別スコア</div>
+        {Object.entries(QTYPE).map(([k,{icon,label,color}])=>{const s=ts[k],p=s.n?Math.round(s.c/s.n*100):0;
+          return <div key={k} style={{display:"flex",alignItems:"center",marginBottom:6,gap:8}}>
+            <span style={{fontSize:16}}>{icon}</span>
+            <span style={{fontSize:12,fontWeight:"bold",color,minWidth:70}}>{label}</span>
+            <div style={{flex:1,height:8,background:"#f0f0f0",borderRadius:4,overflow:"hidden"}}>
+              <div style={{width:`${p}%`,height:"100%",background:color,borderRadius:4,transition:"width 0.5s"}}/></div>
+            <span style={{fontSize:11,color:"#999",minWidth:55,textAlign:"right"}}>{s.c}/{s.n} ({p}%)</span>
+          </div>;})}
+      </div>
+      <div style={{marginBottom:16,lineHeight:2}}>{ans.map((a,i)=><span key={i} style={{margin:2,display:"inline-block",fontSize:14}}>{a.correct?"✅":"❌"}</span>)}</div>
+      <button onClick={restart} style={{background:"linear-gradient(135deg,#667eea,#764ba2)",color:"white",border:"none",padding:"14px 36px",borderRadius:30,fontSize:15,cursor:"pointer",fontWeight:"bold"}}>もう一度やる 🔄</button>
+    </div>);
   }
-  function next(){
-    if(idx+1>=questions.length){setDone(true);return;}
-    const ni=idx+1;
-    setIdx(ni);setChoices(makeChoices(questions,ni));setSelected(null);
-  }
-  function restart(){window.location.reload();}
-  if(done)return(
-    <div style={{textAlign:"center",padding:28}}>
-      <div style={{fontSize:64,marginBottom:12}}>{score>=12?"🎉":score>=9?"😊":"💪"}</div>
-      <div style={{fontSize:24,fontWeight:"bold",marginBottom:6}}>結果：{score} / {questions.length}</div>
-      <div style={{color:"#888",marginBottom:24,fontSize:14}}>
-        {score>=12?"完璧！ピラティス解剖学マスターに近づいています！":score>=9?"いい調子！もう一周してみよう！":"まずは「学ぶ」で確認してから再チャレンジ！"}
-      </div>
-      <div style={{marginBottom:20}}>{answers.map((a,i)=><span key={i} style={{margin:3,display:"inline-block",fontSize:18}}>{a?"✅":"❌"}</span>)}</div>
-      <button onClick={restart} style={{background:"#764ba2",color:"white",border:"none",padding:"14px 36px",borderRadius:30,fontSize:16,cursor:"pointer",fontWeight:"bold"}}>
-        もう一度やる
-      </button>
+  const q=qs[idx],qt=QTYPE[q.qType],prog=((idx)/qs.length)*100;
+  return(<div>
+    <div style={{height:4,background:"#eee",borderRadius:2,marginBottom:10,overflow:"hidden"}}>
+      <div style={{width:`${prog}%`,height:"100%",background:"linear-gradient(90deg,#667eea,#764ba2)",borderRadius:2,transition:"width 0.3s"}}/></div>
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+      <span style={{color:"#aaa",fontSize:12}}>問題 {idx+1} / {qs.length}</span>
+      <span style={{background:"#FFF3CD",color:"#856404",borderRadius:20,padding:"3px 12px",fontSize:12}}>⭐ {score}点</span>
     </div>
-  );
-  const q=questions[idx];
-  return(
-    <div>
-      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:14}}>
-        <span style={{color:"#aaa",fontSize:13}}>問題 {idx+1} / {questions.length}</span>
-        <span style={{background:"#FFF3CD",color:"#856404",borderRadius:20,padding:"4px 14px",fontSize:13}}>⭐ {score}点</span>
+    <div style={{background:"white",borderRadius:16,padding:16,boxShadow:"0 2px 12px rgba(0,0,0,0.10)",marginBottom:12}}>
+      <div style={{display:"flex",gap:6,marginBottom:8,flexWrap:"wrap"}}>
+        <span style={{display:"inline-block",background:qt.color+"18",color:qt.color,borderRadius:20,padding:"3px 10px",fontSize:10,fontWeight:"bold"}}>{qt.icon} {qt.label}</span>
+        <span style={{display:"inline-block",background:q.light,color:q.color,borderRadius:20,padding:"3px 10px",fontSize:10,fontWeight:"bold"}}>{q.badge}</span>
       </div>
-      <div style={{background:"white",borderRadius:16,padding:18,boxShadow:"0 2px 12px rgba(0,0,0,0.10)",marginBottom:14}}>
-        <div style={{display:"inline-block",background:q.light,color:q.color,borderRadius:20,padding:"4px 12px",fontSize:11,fontWeight:"bold",marginBottom:10}}>
-          {q.type==="骨"?"🦴 骨":"💪 筋肉"} · {q.region}
-        </div>
-        <div style={{fontSize:19,fontWeight:"bold",color:"#222",marginBottom:6}}>{q.name}</div>
-        <div style={{fontSize:13,color:"#999"}}>この{q.type}はどこにある？</div>
-      </div>
-      <div>
-        {choices.map((c,i)=>{
-          let bg="white",border="1px solid #eee",col="#333";
-          if(selected){
-            if(c===q.location){bg="#E5F9EA";border="2px solid #2E7D32";col="#1a5e20";}
-            else if(c===selected){bg="#FFE5E5";border="2px solid #E53935";col="#b71c1c";}
-          }
-          return(
-            <button key={i} onClick={()=>handleAnswer(c)}
-              style={{width:"100%",textAlign:"left",padding:"12px 14px",marginBottom:8,borderRadius:12,
-                border,background:bg,color:col,fontSize:12,cursor:selected?"default":"pointer",
-                boxShadow:"0 1px 4px rgba(0,0,0,0.06)",lineHeight:1.5,transition:"all 0.2s"}}>
-              {c===selected&&c!==q.location?"❌ ":c===q.location&&selected?"✅ ":`${["A","B","C","D"][i]}. `}{c}
-            </button>
-          );
-        })}
-      </div>
-      {selected&&(
-        <div>
-          {q.tip&&<div style={{background:"#FFFBEB",border:"1px solid #FCD34D",borderRadius:10,padding:12,marginBottom:12,fontSize:12,color:"#92400E",lineHeight:1.6}}>💡 {q.tip}</div>}
-          <button onClick={next} style={{width:"100%",background:q.color,color:"white",border:"none",padding:14,borderRadius:30,fontSize:15,cursor:"pointer",fontWeight:"bold"}}>
-            {idx+1>=questions.length?"結果を見る 🎉":"次の問題 →"}
-          </button>
-        </div>
-      )}
+      {q.qType==="tip"?(<>
+        <div style={{fontSize:13,color:"#555",lineHeight:1.6,marginBottom:6}}>💡 {q.question}</div>
+        <div style={{fontSize:15,fontWeight:"bold",color:"#222"}}>{q.subject}</div>
+      </>):(<>
+        <div style={{fontSize:17,fontWeight:"bold",color:"#222",marginBottom:4}}>{q.subject}</div>
+        <div style={{fontSize:12,color:"#999"}}>{q.question}</div>
+      </>)}
     </div>
-  );
+    <div>{q.choices.map((c,i)=>{
+      let bg="white",border="1px solid #eee",col="#333";
+      if(sel){if(c===q.correct){bg="#E5F9EA";border="2px solid #2E7D32";col="#1a5e20";}
+        else if(c===sel){bg="#FFE5E5";border="2px solid #E53935";col="#b71c1c";}}
+      return(<button key={i} onClick={()=>pick(c)}
+        style={{width:"100%",textAlign:"left",padding:"11px 14px",marginBottom:7,borderRadius:12,
+          border,background:bg,color:col,fontSize:12,cursor:sel?"default":"pointer",
+          boxShadow:"0 1px 4px rgba(0,0,0,0.06)",lineHeight:1.5,transition:"all 0.2s"}}>
+        {c===sel&&c!==q.correct?"❌ ":c===q.correct&&sel?"✅ ":`${["A","B","C","D"][i]}. `}{c}
+      </button>);
+    })}</div>
+    {sel&&(<div>
+      <div style={{background:"#FFFBEB",border:"1px solid #FCD34D",borderRadius:10,padding:10,marginBottom:10,fontSize:11,color:"#92400E",lineHeight:1.6}}>💡 {q.tip}</div>
+      <button onClick={next} style={{width:"100%",background:qt.color,color:"white",border:"none",padding:13,borderRadius:30,fontSize:14,cursor:"pointer",fontWeight:"bold"}}>
+        {idx+1>=qs.length?"結果を見る 🎉":"次の問題 →"}</button>
+    </div>)}
+  </div>);
 }
 export default function App() {
   const [view,setView] = useState("learn");
