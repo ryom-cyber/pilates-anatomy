@@ -151,82 +151,308 @@ const quizPool = Object.entries(REGIONS).flatMap(([, d]) => [
   ...d.muscles.map(m => ({ type: "筋肉", region: d.label, color: d.color, light: d.light, ...m })),
 ]);
 function shuffle(arr) { return [...arr].sort(() => Math.random() - 0.5); }
-function BodySVG({ active, onSelect }) {
-  const fill = id => active === id ? REGIONS[id].color : REGIONS[id].light;
-  const stroke = id => REGIONS[id].color;
+
+/* ==================== ANATOMICAL BODY SVG ==================== */
+function BodySVG({ activeRegion, onSelectRegion, activeItem, activeTab }) {
+  const hi = (region) => !activeRegion || activeRegion === region;
+  const ma = (name) => activeItem && (activeItem.name.includes(name) || name.includes(activeItem.name.split("（")[0]));
+  const mf = (region, name, base) => ma(name) ? "#FFD54F" : base;
+  const ms = (region, name) => ma(name) ? "#FF6F00" : "#7B241C";
+  const mw = (region, name) => ma(name) ? 2.5 : 0.6;
+  const mo = (region) => hi(region) ? 1 : 0.25;
+  const S = (region, name, base="#D4453B") => ({
+    fill: mf(region, name, base), stroke: ms(region, name), strokeWidth: mw(region, name),
+    opacity: mo(region), cursor:"pointer", transition:"all 0.3s",
+    filter: ma(name) ? "url(#glow)" : "none",
+  });
+  const clk = (r) => () => onSelectRegion(r);
+
+  // Bone overlay paths
+  const boneActive = (name) => activeTab === "bones" && activeItem && (activeItem.name.includes(name) || name.includes(activeItem.name.split("（")[0]));
+  const bs = (name) => ({ fill:"none", stroke: boneActive(name) ? "#FFFFFF" : "rgba(255,255,255,0.5)",
+    strokeWidth: boneActive(name) ? 2.5 : 1.2, strokeDasharray: boneActive(name) ? "none" : "4,3",
+    opacity: boneActive(name) ? 1 : 0.6, filter: boneActive(name) ? "url(#glow)" : "none",
+    transition:"all 0.3s", pointerEvents:"none" });
+
   return (
-    <svg viewBox="0 0 200 440" style={{ width:"100%", maxWidth:200, margin:"0 auto", display:"block" }}>
-      <ellipse cx="100" cy="26" rx="20" ry="24" fill="#F5DEB3" stroke="#C8A876" strokeWidth="1.5"/>
-      <ellipse cx="80" cy="28" rx="5" ry="7" fill="#F5DEB3" stroke="#C8A876" strokeWidth="1"/>
-      <ellipse cx="120" cy="28" rx="5" ry="7" fill="#F5DEB3" stroke="#C8A876" strokeWidth="1"/>
-      <circle cx="93" cy="23" r="2.5" fill="#8B6914"/>
-      <circle cx="107" cy="23" r="2.5" fill="#8B6914"/>
-      <path d="M94,35 Q100,40 106,35" fill="none" stroke="#8B6914" strokeWidth="1.5"/>
-      <g onClick={() => onSelect("neck")} style={{cursor:"pointer"}}>
-        <rect x="88" y="48" width="24" height="18" rx="5" fill={fill("neck")} stroke={stroke("neck")} strokeWidth="2"/>
-        <text x="100" y="61" textAnchor="middle" fontSize="7" fill={active==="neck"?"white":stroke("neck")} fontWeight="bold">首</text>
+    <svg viewBox="0 0 300 640" style={{ width:"100%", maxWidth:280, margin:"0 auto", display:"block" }}>
+      <defs>
+        <linearGradient id="mg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#E8594A"/><stop offset="100%" stopColor="#C0392B"/></linearGradient>
+        <linearGradient id="dg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#B03A2E"/><stop offset="100%" stopColor="#922B21"/></linearGradient>
+        <pattern id="fib" width="3" height="3" patternUnits="userSpaceOnUse" patternTransform="rotate(30)">
+          <line x1="0" y1="0" x2="0" y2="3" stroke="rgba(120,30,10,0.12)" strokeWidth="0.6"/>
+        </pattern>
+        <filter id="glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      </defs>
+
+      {/* ===== BODY SKIN BACKGROUND ===== */}
+      <ellipse cx="150" cy="36" rx="27" ry="31" fill="#F0C8A8" stroke="#D4A574" strokeWidth="1"/>
+      <rect x="132" y="64" width="36" height="30" rx="10" fill="#F0C8A8"/>
+      <path d="M74,108 L226,108 Q232,108 232,114 L224,300 Q218,340 150,345 Q82,340 76,300 L68,114 Q68,108 74,108 Z" fill="#F0C8A8"/>
+      {/* Left arm */}
+      <path d="M68,108 C54,116 46,135 46,160 L40,232 C38,248 36,268 34,290 L30,328 C28,342 26,358 30,365 C36,374 46,370 48,358 L52,328 C54,308 56,288 58,268 L64,232 C66,216 68,196 70,176 Z" fill="#F0C8A8"/>
+      {/* Right arm */}
+      <path d="M232,108 C246,116 254,135 254,160 L260,232 C262,248 264,268 266,290 L270,328 C272,342 274,358 270,365 C264,374 254,370 252,358 L248,328 C246,308 244,288 242,268 L236,232 C234,216 232,196 230,176 Z" fill="#F0C8A8"/>
+      {/* Left leg */}
+      <path d="M96,300 C90,335 86,360 86,380 L84,460 C82,470 84,480 88,492 L94,575 C96,588 94,598 98,610 L128,618 L148,616 L148,300 Z" fill="#F0C8A8"/>
+      {/* Right leg */}
+      <path d="M204,300 C210,335 214,360 214,380 L216,460 C218,470 216,480 212,492 L206,575 C204,588 206,598 202,610 L172,618 L152,616 L152,300 Z" fill="#F0C8A8"/>
+      {/* Feet */}
+      <path d="M98,608 C92,612 86,618 90,624 L130,628 C136,626 134,614 130,610 Z" fill="#F0C8A8"/>
+      <path d="M202,608 C208,612 214,618 210,624 L170,628 C164,626 166,614 170,610 Z" fill="#F0C8A8"/>
+      {/* Head features */}
+      <circle cx="140" cy="30" r="3" fill="#6B4226"/>
+      <circle cx="160" cy="30" r="3" fill="#6B4226"/>
+      <path d="M143,44 Q150,50 157,44" fill="none" stroke="#6B4226" strokeWidth="1.5"/>
+      {/* Ears */}
+      <ellipse cx="122" cy="36" rx="5" ry="8" fill="#F0C8A8" stroke="#D4A574" strokeWidth="0.8"/>
+      <ellipse cx="178" cy="36" rx="5" ry="8" fill="#F0C8A8" stroke="#D4A574" strokeWidth="0.8"/>
+
+      {/* ===== MUSCLES ===== */}
+
+      {/* --- NECK --- */}
+      <g onClick={clk("neck")}>
+        {/* SCM left */}
+        <path d="M138,68 C136,74 130,84 132,94 L140,96 C141,86 142,76 144,70 Z" style={S("neck","胸鎖乳突筋","#C9453A")}/>
+        {/* SCM right */}
+        <path d="M162,68 C164,74 170,84 168,94 L160,96 C159,86 158,76 156,70 Z" style={S("neck","胸鎖乳突筋","#C9453A")}/>
+        {/* Scalenes left */}
+        <path d="M130,72 C126,80 124,90 126,98 L132,96 C132,88 132,78 134,72 Z" style={S("neck","斜角筋","#B5382E")}/>
+        {/* Scalenes right */}
+        <path d="M170,72 C174,80 176,90 174,98 L168,96 C168,88 168,78 166,72 Z" style={S("neck","斜角筋","#B5382E")}/>
+        {/* Front neck deep */}
+        <path d="M142,72 L158,72 L156,92 L144,92 Z" style={S("neck","頭長筋","#A0302A")}/>
       </g>
-      <g onClick={() => onSelect("upper")} style={{cursor:"pointer"}}>
-        <path d="M88,66 Q100,62 112,66 L128,72 L134,78 Q100,88 66,78 L72,72 Z" fill={fill("upper")} stroke={stroke("upper")} strokeWidth="1.5"/>
-        <ellipse cx="60" cy="84" rx="13" ry="11" fill={fill("upper")} stroke={stroke("upper")} strokeWidth="1.5"/>
-        <ellipse cx="140" cy="84" rx="13" ry="11" fill={fill("upper")} stroke={stroke("upper")} strokeWidth="1.5"/>
-        <rect x="47" y="92" width="18" height="52" rx="9" fill={fill("upper")} stroke={stroke("upper")} strokeWidth="1.5"/>
-        <rect x="135" y="92" width="18" height="52" rx="9" fill={fill("upper")} stroke={stroke("upper")} strokeWidth="1.5"/>
-        <rect x="49" y="146" width="14" height="40" rx="7" fill={fill("upper")} stroke={stroke("upper")} strokeWidth="1.5"/>
-        <rect x="137" y="146" width="14" height="40" rx="7" fill={fill("upper")} stroke={stroke("upper")} strokeWidth="1.5"/>
-        <ellipse cx="56" cy="192" rx="9" ry="7" fill={fill("upper")} stroke={stroke("upper")} strokeWidth="1.5"/>
-        <ellipse cx="144" cy="192" rx="9" ry="7" fill={fill("upper")} stroke={stroke("upper")} strokeWidth="1.5"/>
-        <rect x="66" y="78" width="68" height="56" rx="6" fill={fill("upper")} stroke={stroke("upper")} strokeWidth="1.5"/>
-        <line x1="100" y1="78" x2="100" y2="134" stroke={stroke("upper")} strokeWidth="1" strokeDasharray="3,2" opacity="0.4"/>
-        {[90,104,118,130].map((y,i)=>(
-          <g key={i} opacity="0.35">
-            <path d={`M100,${y} Q82,${y+4} 70,${y+2}`} fill="none" stroke={stroke("upper")} strokeWidth="1"/>
-            <path d={`M100,${y} Q118,${y+4} 130,${y+2}`} fill="none" stroke={stroke("upper")} strokeWidth="1"/>
-          </g>
-        ))}
-        <text x="100" y="110" textAnchor="middle" fontSize="8" fill={active==="upper"?"white":stroke("upper")} fontWeight="bold">上半身・肩</text>
+
+      {/* --- UPPER BODY --- */}
+      <g onClick={clk("upper")}>
+        {/* Trapezius upper left */}
+        <path d="M132,82 C118,88 92,100 76,110 L80,118 C96,106 122,94 136,88 Z" style={S("upper","僧帽筋","#D4453B")}/>
+        {/* Trapezius upper right */}
+        <path d="M168,82 C182,88 208,100 224,110 L220,118 C204,106 178,94 164,88 Z" style={S("upper","僧帽筋","#D4453B")}/>
+
+        {/* Deltoid left */}
+        <path d="M76,110 C62,118 54,138 58,158 C60,164 66,166 70,162 C72,150 76,134 86,120 L92,114 Z" style={S("upper","三角筋","#E05A4B")}/>
+        {/* Deltoid right */}
+        <path d="M224,110 C238,118 246,138 242,158 C240,164 234,166 230,162 C228,150 224,134 214,120 L208,114 Z" style={S("upper","三角筋","#E05A4B")}/>
+
+        {/* Pectoral left */}
+        <path d="M92,114 C98,110 130,108 148,120 L148,178 C136,185 108,184 94,175 C82,168 76,152 78,138 Z" style={S("upper","大胸筋","#D4453B")}/>
+        {/* Pec fiber lines left */}
+        {[130,142,154,166].map((y,i)=><line key={`pfl${i}`} x1="148" y1={y} x2={92-i*3} y2={y+8+i*2} stroke="rgba(120,30,10,0.15)" strokeWidth="0.5" style={{opacity:mo("upper"),pointerEvents:"none"}}/>)}
+        {/* Pectoral right */}
+        <path d="M208,114 C202,110 170,108 152,120 L152,178 C164,185 192,184 206,175 C218,168 224,152 222,138 Z" style={S("upper","大胸筋","#D4453B")}/>
+        {[130,142,154,166].map((y,i)=><line key={`pfr${i}`} x1="152" y1={y} x2={208+i*3} y2={y+8+i*2} stroke="rgba(120,30,10,0.15)" strokeWidth="0.5" style={{opacity:mo("upper"),pointerEvents:"none"}}/>)}
+
+        {/* Serratus anterior left */}
+        {[158,170,182].map((y,i)=><path key={`sl${i}`} d={`M${84-i*2},${y} L${92-i},${y+2} L${90-i},${y+10} L${82-i*2},${y+8} Z`} style={S("upper","前鋸筋","#BA3A30")}/>)}
+        {/* Serratus anterior right */}
+        {[158,170,182].map((y,i)=><path key={`sr${i}`} d={`M${216+i*2},${y} L${208+i},${y+2} L${210+i},${y+10} L${218+i*2},${y+8} Z`} style={S("upper","前鋸筋","#BA3A30")}/>)}
+
+        {/* Bicep left */}
+        <path d="M60,160 C54,172 50,200 48,228 C46,238 50,242 56,240 C60,234 64,210 66,190 C68,175 66,165 64,160 Z" style={S("upper","上腕二頭筋","#D94F42")}/>
+        {/* Bicep right */}
+        <path d="M240,160 C246,172 250,200 252,228 C254,238 250,242 244,240 C240,234 236,210 234,190 C232,175 234,165 236,160 Z" style={S("upper","上腕二頭筋","#D94F42")}/>
+
+        {/* Tricep left (visible from outer side) */}
+        <path d="M56,162 C50,170 46,195 44,225 C42,235 44,240 48,238 L50,228 C52,205 54,180 58,165 Z" style={S("upper","上腕三頭筋","#B5382E")}/>
+        {/* Tricep right */}
+        <path d="M244,162 C250,170 254,195 256,225 C258,235 256,240 252,238 L250,228 C248,205 246,180 242,165 Z" style={S("upper","上腕三頭筋","#B5382E")}/>
+
+        {/* Forearm left */}
+        <path d="M46,240 C42,260 38,290 36,318 C34,332 32,348 36,358 C40,366 48,362 50,352 L52,330 C54,310 56,285 58,262 L60,242 Z" style={S("upper","前腕屈筋群","#C9453A")}/>
+        {/* Forearm fiber lines */}
+        {[255,275,295,315].map((y,i)=><line key={`ffl${i}`} x1={56-i*2} y1={y} x2={52-i*3} y2={y+18} stroke="rgba(120,30,10,0.12)" strokeWidth="0.4" style={{opacity:mo("upper"),pointerEvents:"none"}}/>)}
+        {/* Forearm right */}
+        <path d="M254,240 C258,260 262,290 264,318 C266,332 268,348 264,358 C260,366 252,362 250,352 L248,330 C246,310 244,285 242,262 L240,242 Z" style={S("upper","前腕屈筋群","#C9453A")}/>
+        {[255,275,295,315].map((y,i)=><line key={`ffr${i}`} x1={244+i*2} y1={y} x2={248+i*3} y2={y+18} stroke="rgba(120,30,10,0.12)" strokeWidth="0.4" style={{opacity:mo("upper"),pointerEvents:"none"}}/>)}
       </g>
-      <g onClick={() => onSelect("core")} style={{cursor:"pointer"}}>
-        <rect x="68" y="134" width="64" height="66" rx="6" fill={fill("core")} stroke={stroke("core")} strokeWidth="2"/>
-        <line x1="100" y1="134" x2="100" y2="200" stroke={stroke("core")} strokeWidth="1.5" strokeDasharray="4,3" opacity="0.5"/>
-        {[150,166,182].map((y,i)=>(
-          <line key={i} x1="74" y1={y} x2="126" y2={y} stroke={stroke("core")} strokeWidth="0.8" opacity="0.35"/>
-        ))}
-        <text x="100" y="172" textAnchor="middle" fontSize="8" fill={active==="core"?"white":stroke("core")} fontWeight="bold">体幹・コア</text>
+
+      {/* --- CORE --- */}
+      <g onClick={clk("core")}>
+        {/* External oblique left */}
+        <path d="M86,192 C82,215 80,245 82,275 C84,290 90,298 96,296 L98,278 C96,255 94,228 92,205 Z" style={S("core","外腹斜筋","#C0392B")}/>
+        {/* Oblique fiber lines left */}
+        {[205,225,245,265].map((y,i)=><line key={`ofl${i}`} x1={94-i} y1={y} x2={86-i} y2={y+18} stroke="rgba(120,30,10,0.15)" strokeWidth="0.4" style={{opacity:mo("core"),pointerEvents:"none"}}/>)}
+        {/* External oblique right */}
+        <path d="M214,192 C218,215 220,245 218,275 C216,290 210,298 204,296 L202,278 C204,255 206,228 208,205 Z" style={S("core","外腹斜筋","#C0392B")}/>
+        {[205,225,245,265].map((y,i)=><line key={`ofr${i}`} x1={206+i} y1={y} x2={214+i} y2={y+18} stroke="rgba(120,30,10,0.15)" strokeWidth="0.4" style={{opacity:mo("core"),pointerEvents:"none"}}/>)}
+
+        {/* Rectus abdominis - 8 segments */}
+        {[0,1,2,3].map(row => [0,1].map(col => {
+          const x = col === 0 ? 133 : 155;
+          const w = 18;
+          const heights = [24, 24, 22, 20];
+          const gaps = [194, 222, 250, 276];
+          const y = gaps[row];
+          const h = heights[row];
+          const xShrink = row >= 2 ? row * 1.5 : 0;
+          return <rect key={`abs${row}${col}`}
+            x={x + (col===0?xShrink:0)} y={y}
+            width={w - (col===0?xShrink:xShrink)} height={h}
+            rx="3" style={S("core","腹直筋","#D4453B")} />;
+        }))}
+        {/* Linea alba */}
+        <line x1="150" y1="120" x2="150" y2="300" stroke="#F0C8A8" strokeWidth="3" style={{opacity:mo("core"),pointerEvents:"none"}}/>
+        {/* Tendinous inscriptions */}
+        {[218,246,274].map((y,i)=><line key={`ti${i}`} x1="134" y1={y} x2="166" y2={y} stroke="#F0C8A8" strokeWidth="2" style={{opacity:mo("core")*0.7,pointerEvents:"none"}}/>)}
       </g>
-      <g onClick={() => onSelect("hip")} style={{cursor:"pointer"}}>
-        <path d="M64,200 Q100,214 136,200 L138,228 Q100,242 62,228 Z" fill={fill("hip")} stroke={stroke("hip")} strokeWidth="2"/>
-        <path d="M76,212 Q100,224 124,212" fill="none" stroke={stroke("hip")} strokeWidth="1" opacity="0.5"/>
-        <circle cx="76" cy="228" r="7" fill={fill("hip")} stroke={stroke("hip")} strokeWidth="1.5"/>
-        <circle cx="124" cy="228" r="7" fill={fill("hip")} stroke={stroke("hip")} strokeWidth="1.5"/>
-        <text x="100" y="218" textAnchor="middle" fontSize="7.5" fill={active==="hip"?"white":stroke("hip")} fontWeight="bold">股関節</text>
+
+      {/* --- HIP --- */}
+      <g onClick={clk("hip")}>
+        {/* TFL / Glute med left */}
+        <path d="M82,290 C78,305 78,325 84,340 L94,340 C92,322 90,305 92,292 Z" style={S("hip","大腿筋膜張筋","#D4453B")}/>
+        {/* TFL / Glute med right */}
+        <path d="M218,290 C222,305 222,325 216,340 L206,340 C208,322 210,305 208,292 Z" style={S("hip","大腿筋膜張筋","#D4453B")}/>
+        {/* Inguinal / hip flexor left */}
+        <path d="M96,296 C110,312 128,326 144,332 L148,332 L148,298 C132,294 112,292 96,296 Z" style={S("hip","縫工筋","#C9453A")}/>
+        {/* Inguinal / hip flexor right */}
+        <path d="M204,296 C190,312 172,326 156,332 L152,332 L152,298 C168,294 188,292 204,296 Z" style={S("hip","縫工筋","#C9453A")}/>
+        {/* Gluteus medius visible left */}
+        <path d="M80,285 C76,292 78,302 82,290 Z" style={S("hip","中臀筋","#BA3A30")}/>
+        {/* Gluteus medius visible right */}
+        <path d="M220,285 C224,292 222,302 218,290 Z" style={S("hip","中臀筋","#BA3A30")}/>
       </g>
-      <g onClick={() => onSelect("thigh")} style={{cursor:"pointer"}}>
-        <rect x="62" y="232" width="28" height="76" rx="13" fill={fill("thigh")} stroke={stroke("thigh")} strokeWidth="1.5"/>
-        <rect x="110" y="232" width="28" height="76" rx="13" fill={fill("thigh")} stroke={stroke("thigh")} strokeWidth="1.5"/>
-        <line x1="76" y1="238" x2="76" y2="300" stroke={stroke("thigh")} strokeWidth="1" strokeDasharray="4,3" opacity="0.4"/>
-        <line x1="124" y1="238" x2="124" y2="300" stroke={stroke("thigh")} strokeWidth="1" strokeDasharray="4,3" opacity="0.4"/>
-        <ellipse cx="76" cy="312" rx="14" ry="9" fill={fill("thigh")} stroke={stroke("thigh")} strokeWidth="1.5"/>
-        <ellipse cx="124" cy="312" rx="14" ry="9" fill={fill("thigh")} stroke={stroke("thigh")} strokeWidth="1.5"/>
-        <text x="100" y="272" textAnchor="middle" fontSize="8" fill={active==="thigh"?"white":stroke("thigh")} fontWeight="bold">太もも・膝</text>
+
+      {/* --- THIGH --- */}
+      <g onClick={clk("thigh")}>
+        {/* Vastus lateralis left */}
+        <path d="M86,342 C82,365 82,400 86,430 C88,445 94,458 102,462 L112,458 C108,445 106,425 106,400 C106,375 108,355 110,342 Z" style={S("thigh","外側広筋","#C0392B")}/>
+        {/* Vastus lateralis right */}
+        <path d="M214,342 C218,365 218,400 214,430 C212,445 206,458 198,462 L188,458 C192,445 194,425 194,400 C194,375 192,355 190,342 Z" style={S("thigh","外側広筋","#C0392B")}/>
+
+        {/* Adductors left */}
+        <path d="M136,338 C140,360 142,395 140,425 C138,445 134,458 130,462 L122,458 C126,445 128,425 128,400 C128,375 128,355 130,340 Z" style={S("thigh","長内転筋","#B03A2E")}/>
+        {/* Adductors right */}
+        <path d="M164,338 C160,360 158,395 160,425 C162,445 166,458 170,462 L178,458 C174,445 172,425 172,400 C172,375 172,355 170,340 Z" style={S("thigh","長内転筋","#B03A2E")}/>
+
+        {/* Rectus femoris left */}
+        <path d="M112,340 C108,358 106,385 106,412 C106,435 110,452 114,460 L126,460 C130,452 132,435 132,412 C132,385 128,358 124,340 Z" style={S("thigh","大腿直筋","#D4453B")}/>
+        {/* Rectus femoris fiber lines left */}
+        {[355,380,405,430].map((y,i)=><line key={`rfl${i}`} x1="118" y1={y} x2="118" y2={y+20} stroke="rgba(120,30,10,0.12)" strokeWidth="0.5" style={{opacity:mo("thigh"),pointerEvents:"none"}}/>)}
+        {/* Rectus femoris right */}
+        <path d="M188,340 C192,358 194,385 194,412 C194,435 190,452 186,460 L174,460 C170,452 168,435 168,412 C168,385 172,358 176,340 Z" style={S("thigh","大腿直筋","#D4453B")}/>
+        {[355,380,405,430].map((y,i)=><line key={`rfr${i}`} x1="182" y1={y} x2="182" y2={y+20} stroke="rgba(120,30,10,0.12)" strokeWidth="0.5" style={{opacity:mo("thigh"),pointerEvents:"none"}}/>)}
+
+        {/* Vastus medialis left (teardrop) */}
+        <path d="M126,422 C130,432 134,448 132,460 L122,464 C118,452 116,438 120,425 Z" style={S("thigh","内側広筋","#D94F42")}/>
+        {/* Vastus medialis right */}
+        <path d="M174,422 C170,432 166,448 168,460 L178,464 C182,452 184,438 180,425 Z" style={S("thigh","内側広筋","#D94F42")}/>
+
+        {/* Patella left */}
+        <ellipse cx="118" cy="468" rx="11" ry="8" fill="#F5CBA7" stroke="#D4A574" strokeWidth="1" style={{opacity:mo("thigh")}}/>
+        {/* Patella right */}
+        <ellipse cx="182" cy="468" rx="11" ry="8" fill="#F5CBA7" stroke="#D4A574" strokeWidth="1" style={{opacity:mo("thigh")}}/>
       </g>
-      <g onClick={() => onSelect("foot")} style={{cursor:"pointer"}}>
-        <rect x="64" y="318" width="24" height="64" rx="10" fill={fill("foot")} stroke={stroke("foot")} strokeWidth="1.5"/>
-        <rect x="112" y="318" width="24" height="64" rx="10" fill={fill("foot")} stroke={stroke("foot")} strokeWidth="1.5"/>
-        <ellipse cx="76" cy="386" rx="12" ry="7" fill={fill("foot")} stroke={stroke("foot")} strokeWidth="1.5"/>
-        <ellipse cx="124" cy="386" rx="12" ry="7" fill={fill("foot")} stroke={stroke("foot")} strokeWidth="1.5"/>
-        <ellipse cx="72" cy="397" rx="14" ry="6" fill={fill("foot")} stroke={stroke("foot")} strokeWidth="1.5"/>
-        <ellipse cx="128" cy="397" rx="14" ry="6" fill={fill("foot")} stroke={stroke("foot")} strokeWidth="1.5"/>
-        <text x="100" y="354" textAnchor="middle" fontSize="8" fill={active==="foot"?"white":stroke("foot")} fontWeight="bold">下腿・足首</text>
+
+      {/* --- FOOT / LOWER LEG --- */}
+      <g onClick={clk("foot")}>
+        {/* Tibialis anterior left */}
+        <path d="M112,478 C110,495 108,525 110,558 C112,568 116,572 118,568 C120,555 120,528 118,500 C116,488 114,480 114,478 Z" style={S("foot","前脛骨筋","#D4453B")}/>
+        {/* Tibialis anterior right */}
+        <path d="M188,478 C190,495 192,525 190,558 C188,568 184,572 182,568 C180,555 180,528 182,500 C184,488 186,480 186,478 Z" style={S("foot","前脛骨筋","#D4453B")}/>
+
+        {/* Gastrocnemius left */}
+        <path d="M98,476 C94,494 92,520 96,548 C98,558 104,562 108,556 C110,542 110,518 108,496 C106,484 102,478 100,476 Z" style={S("foot","腓腹筋","#C9453A")}/>
+        {/* Gastrocnemius right */}
+        <path d="M202,476 C206,494 208,520 204,548 C202,558 196,562 192,556 C190,542 190,518 192,496 C194,484 198,478 200,476 Z" style={S("foot","腓腹筋","#C9453A")}/>
+
+        {/* Peroneus left */}
+        <path d="M96,480 C92,498 90,525 92,555 C93,562 96,564 98,560 C100,545 100,520 100,498 Z" style={S("foot","長腓骨筋","#BA3A30")}/>
+        {/* Peroneus right */}
+        <path d="M204,480 C208,498 210,525 208,555 C207,562 204,564 202,560 C200,545 200,520 200,498 Z" style={S("foot","長腓骨筋","#BA3A30")}/>
+
+        {/* Soleus left */}
+        <path d="M100,555 C102,565 106,572 110,574 L108,570 C106,562 104,558 102,555 Z" style={S("foot","ヒラメ筋","#A0302A")}/>
+        {/* Soleus right */}
+        <path d="M200,555 C198,565 194,572 190,574 L192,570 C194,562 196,558 198,555 Z" style={S("foot","ヒラメ筋","#A0302A")}/>
+
+        {/* Achilles tendon left */}
+        <path d="M106,572 L108,592 L104,592 L102,572 Z" fill="#F5CBA7" stroke="#D4A574" strokeWidth="0.5" style={{opacity:mo("foot")}}/>
+        {/* Achilles tendon right */}
+        <path d="M194,572 L192,592 L196,592 L198,572 Z" fill="#F5CBA7" stroke="#D4A574" strokeWidth="0.5" style={{opacity:mo("foot")}}/>
+
+        {/* Foot muscles left */}
+        <path d="M98,608 C92,612 86,618 90,624 L128,628 C134,624 132,616 128,610 Z" style={S("foot","足底筋群","#C9453A")}/>
+        {/* Foot muscles right */}
+        <path d="M202,608 C208,612 214,618 210,624 L172,628 C166,624 168,616 172,610 Z" style={S("foot","足底筋群","#C9453A")}/>
       </g>
+
+      {/* ===== BONE OVERLAY (when bones tab active) ===== */}
+      {activeTab === "bones" && (
+        <g>
+          {/* Spine */}
+          <path d="M150,68 L150,320" style={bs("椎")}/>
+          {/* Cervical vertebrae dots */}
+          {[72,78,84,90].map((y,i)=><circle key={`cv${i}`} cx="150" cy={y} r={boneActive("頸椎")?3:1.5} fill={boneActive("頸椎")?"white":"rgba(255,255,255,0.5)"} style={{transition:"all 0.3s"}}/>)}
+          {/* Thoracic vertebrae */}
+          {[100,115,130,145,160,175,190].map((y,i)=><circle key={`tv${i}`} cx="150" cy={y} r={boneActive("胸椎")?2.5:1.2} fill={boneActive("胸椎")?"white":"rgba(255,255,255,0.4)"} style={{transition:"all 0.3s"}}/>)}
+          {/* Lumbar vertebrae */}
+          {[210,230,250,270,285].map((y,i)=><circle key={`lv${i}`} cx="150" cy={y} r={boneActive("腰椎")?3:1.5} fill={boneActive("腰椎")?"white":"rgba(255,255,255,0.4)"} style={{transition:"all 0.3s"}}/>)}
+          {/* Sacrum */}
+          <path d="M144,295 L156,295 L152,320 L148,320 Z" style={bs("仙骨")}/>
+          {/* Clavicles */}
+          <path d="M150,98 C130,96 100,100 78,110" style={bs("鎖骨")}/>
+          <path d="M150,98 C170,96 200,100 222,110" style={bs("鎖骨")}/>
+          {/* Sternum */}
+          <path d="M150,100 L150,192" style={bs("胸骨")}/>
+          {/* Ribs */}
+          {[110,125,140,155,170,182].map((y,i)=><g key={`rib${i}`}>
+            <path d={`M150,${y} Q${120-i*3},${y+8} ${85-i*2},${y+4}`} style={bs("肋骨")}/>
+            <path d={`M150,${y} Q${180+i*3},${y+8} ${215+i*2},${y+4}`} style={bs("肋骨")}/>
+          </g>)}
+          {/* Pelvis */}
+          <path d="M92,286 Q120,275 150,280 Q180,275 208,286 L212,310 Q200,330 150,335 Q100,330 88,310 Z" style={bs("骨盤")}/>
+          {/* Femur left */}
+          <path d="M108,340 L116,455" style={bs("大腿骨")}/>
+          {/* Femur right */}
+          <path d="M192,340 L184,455" style={bs("大腿骨")}/>
+          {/* Patella bones */}
+          <ellipse cx="118" cy="468" rx="8" ry="6" style={bs("膝蓋骨")}/>
+          <ellipse cx="182" cy="468" rx="8" ry="6" style={bs("膝蓋骨")}/>
+          {/* Tibia left */}
+          <path d="M116,478 L112,580" style={bs("脛骨")}/>
+          {/* Tibia right */}
+          <path d="M184,478 L188,580" style={bs("脛骨")}/>
+          {/* Fibula left */}
+          <path d="M104,478 L100,575" style={bs("腓骨")}/>
+          {/* Fibula right */}
+          <path d="M196,478 L200,575" style={bs("腓骨")}/>
+          {/* Humerus */}
+          <path d="M72,112 L50,235" style={bs("上腕骨")}/>
+          <path d="M228,112 L250,235" style={bs("上腕骨")}/>
+          {/* Radius/Ulna */}
+          <path d="M50,238 L36,330" style={bs("橈骨")}/>
+          <path d="M48,238 L38,328" style={bs("尺骨")}/>
+          <path d="M250,238 L264,330" style={bs("橈骨")}/>
+          <path d="M252,238 L262,328" style={bs("尺骨")}/>
+          {/* Foot bones */}
+          <path d="M112,582 L108,610 L96,618" style={bs("踵骨")}/>
+          <path d="M188,582 L192,610 L204,618" style={bs("踵骨")}/>
+        </g>
+      )}
+
+      {/* ===== FIBER TEXTURE OVERLAY ===== */}
+      <rect x="0" y="0" width="300" height="640" fill="url(#fib)" opacity="0.3" pointerEvents="none"/>
+
+      {/* ===== REGION LABELS ===== */}
+      <text x="150" y="82" textAnchor="middle" fontSize="7" fill="white" fontWeight="bold" style={{opacity:hi("neck")?0.9:0.2,pointerEvents:"none"}}>首</text>
+      <text x="150" y="150" textAnchor="middle" fontSize="8" fill="white" fontWeight="bold" style={{opacity:hi("upper")?0.9:0.2,pointerEvents:"none"}}>胸</text>
+      <text x="150" y="256" textAnchor="middle" fontSize="8" fill="white" fontWeight="bold" style={{opacity:hi("core")?0.9:0.2,pointerEvents:"none"}}>コア</text>
+      <text x="150" y="316" textAnchor="middle" fontSize="7" fill="white" fontWeight="bold" style={{opacity:hi("hip")?0.9:0.2,pointerEvents:"none"}}>股関節</text>
+      <text x="118" y="405" textAnchor="middle" fontSize="7" fill="white" fontWeight="bold" style={{opacity:hi("thigh")?0.9:0.2,pointerEvents:"none"}}>太もも</text>
+      <text x="118" y="530" textAnchor="middle" fontSize="7" fill="white" fontWeight="bold" style={{opacity:hi("foot")?0.8:0.2,pointerEvents:"none"}}>下腿</text>
     </svg>
   );
 }
+
+/* ==================== LEARN VIEW ==================== */
 function LearnView() {
   const [selected, setSelected] = useState(null);
   const [tab, setTab] = useState("muscles");
   const [openIdx, setOpenIdx] = useState(null);
   const d = selected ? REGIONS[selected] : null;
+  const activeItem = d && openIdx !== null ? (tab === "muscles" ? d.muscles[openIdx] : tab === "bones" ? d.bones[openIdx] : null) : null;
   const regionList = [
     {id:"neck",label:"首・頸部"},{id:"upper",label:"上半身・肩"},
     {id:"core",label:"体幹・コア"},{id:"hip",label:"股関節・骨盤底"},
@@ -235,7 +461,12 @@ function LearnView() {
   return (
     <div>
       <p style={{textAlign:"center",color:"#999",fontSize:12,marginBottom:6}}>部位をタップして学ぼう</p>
-      <BodySVG active={selected} onSelect={id=>{setSelected(id===selected?null:id);setTab("muscles");setOpenIdx(null);}}/>
+      <BodySVG
+        activeRegion={selected}
+        onSelectRegion={id=>{setSelected(id===selected?null:id);setTab("muscles");setOpenIdx(null);}}
+        activeItem={activeItem}
+        activeTab={tab}
+      />
       <div style={{display:"flex",flexWrap:"wrap",gap:6,marginTop:10,marginBottom:4}}>
         {regionList.map(r=>(
           <button key={r.id} onClick={()=>{setSelected(r.id===selected?null:r.id);setTab("muscles");setOpenIdx(null);}}
