@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 const REGIONS = {
   neck: {
     label: "首・頸部", emoji: "🟣", color: "#9B59B6", light: "#F5EEF8",
@@ -152,38 +152,67 @@ const quizPool = Object.entries(REGIONS).flatMap(([, d]) => [
 ]);
 function shuffle(arr) { return [...arr].sort(() => Math.random() - 0.5); }
 
-/* ==================== ANATOMICAL BODY SVG ==================== */
-function BodySVG({ activeRegion, onSelectRegion, activeItem, activeTab }) {
-  const hi = (region) => !activeRegion || activeRegion === region;
-  const ma = (name) => activeItem && (activeItem.name.includes(name) || name.includes(activeItem.name.split("（")[0]));
-  const mf = (region, name, base) => ma(name) ? "#FFD54F" : base;
-  const ms = (region, name) => ma(name) ? "#FF6F00" : "#7B241C";
-  const mw = (region, name) => ma(name) ? 2.5 : 0.6;
-  const mo = (region) => hi(region) ? 1 : 0.25;
-  const S = (region, name, base="#D4453B") => ({
-    fill: mf(region, name, base), stroke: ms(region, name), strokeWidth: mw(region, name),
-    opacity: mo(region), cursor:"pointer", transition:"all 0.3s",
-    filter: ma(name) ? "url(#glow)" : "none",
+const MUSCLE_VIEW_MAP = {
+  "胸鎖乳突筋":"front","斜角筋":"front","肩甲挙筋":"side","板状筋":"back","半棘筋":"back",
+  "頭長筋":"front","舌骨上下筋群":"front",
+  "腹横筋":"side","腹直筋":"front","外腹斜筋":"front","内腹斜筋":"side",
+  "多裂筋":"back","脊柱起立筋":"back","腰方形筋":"side","腸腰筋":"side",
+  "横隔膜":"side","骨盤底筋群":"side","肋間筋":"side","回旋筋":"back","棘間筋":"back",
+  "僧帽筋":"back","前鋸筋":"front","菱形筋":"back","広背筋":"back",
+  "大胸筋":"front","小胸筋":"front","三角筋":"front",
+  "棘上筋":"back","棘下筋":"back","小円筋":"back","肩甲下筋":"back","大円筋":"back",
+  "烏口腕筋":"front","上腕二頭筋":"front","上腕三頭筋":"back","前腕屈筋群":"front",
+  "大臀筋":"back","中臀筋":"back","小臀筋":"side",
+  "梨状筋":"back","上双子筋":"back","内閉鎖筋":"back","大腿方形筋":"back",
+  "大腿筋膜張筋":"front","縫工筋":"front",
+  "大腿直筋":"front","外側広筋":"front","内側広筋":"front","中間広筋":"front",
+  "大腿二頭筋":"back","半腱様筋":"back","半膜様筋":"back",
+  "大内転筋":"side","長内転筋":"front","薄筋":"side","恥骨筋":"front",
+  "腓腹筋":"back","ヒラメ筋":"back","前脛骨筋":"front","後脛骨筋":"back",
+  "長腓骨筋":"front","長趾伸筋":"front","長趾屈筋":"back","足底筋群":"front",
+};
+
+function getViewForMuscle(name) {
+  for (const [key, view] of Object.entries(MUSCLE_VIEW_MAP)) {
+    if (name.includes(key) || key.includes(name.split("（")[0])) return view;
+  }
+  return "front";
+}
+
+function useBH(activeRegion, activeItem, activeTab) {
+  const hi = (r) => !activeRegion || activeRegion === r;
+  const ma = (n) => activeItem && (activeItem.name.includes(n) || n.includes(activeItem.name.split("（")[0]));
+  const S = (r, n, base="#D4453B") => ({
+    fill: ma(n) ? "#FFD54F" : base, stroke: ma(n) ? "#FF6F00" : "#7B241C",
+    strokeWidth: ma(n) ? 2.5 : 0.6, opacity: hi(r) ? 1 : 0.25,
+    cursor:"pointer", transition:"all 0.3s", filter: ma(n) ? "url(#glow)" : "none",
   });
-  const clk = (r) => () => onSelectRegion(r);
-
-  // Bone overlay paths
-  const boneActive = (name) => activeTab === "bones" && activeItem && (activeItem.name.includes(name) || name.includes(activeItem.name.split("（")[0]));
-  const bs = (name) => ({ fill:"none", stroke: boneActive(name) ? "#FFFFFF" : "rgba(255,255,255,0.5)",
-    strokeWidth: boneActive(name) ? 2.5 : 1.2, strokeDasharray: boneActive(name) ? "none" : "4,3",
-    opacity: boneActive(name) ? 1 : 0.6, filter: boneActive(name) ? "url(#glow)" : "none",
+  const mo = (r) => hi(r) ? 1 : 0.25;
+  const boneActive = (n) => activeTab === "bones" && activeItem && (activeItem.name.includes(n) || n.includes(activeItem.name.split("（")[0]));
+  const bs = (n) => ({ fill:"none", stroke: boneActive(n) ? "#FFF" : "rgba(255,255,255,0.5)",
+    strokeWidth: boneActive(n) ? 2.5 : 1.2, strokeDasharray: boneActive(n) ? "none" : "4,3",
+    opacity: boneActive(n) ? 1 : 0.6, filter: boneActive(n) ? "url(#glow)" : "none",
     transition:"all 0.3s", pointerEvents:"none" });
+  return { S, mo, bs, boneActive, hi };
+}
 
+function SvgDefs() {
+  return <defs>
+    <linearGradient id="mg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#E8594A"/><stop offset="100%" stopColor="#C0392B"/></linearGradient>
+    <pattern id="fib" width="3" height="3" patternUnits="userSpaceOnUse" patternTransform="rotate(30)">
+      <line x1="0" y1="0" x2="0" y2="3" stroke="rgba(120,30,10,0.12)" strokeWidth="0.6"/>
+    </pattern>
+    <filter id="glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>;
+}
+
+/* ==================== FRONT VIEW ==================== */
+function BodySVGFront({ activeRegion, onSelectRegion, activeItem, activeTab }) {
+  const { S, mo, bs, boneActive, hi } = useBH(activeRegion, activeItem, activeTab);
+  const clk = (r) => () => onSelectRegion(r);
   return (
     <svg viewBox="0 0 300 640" style={{ width:"100%", maxWidth:280, margin:"0 auto", display:"block" }}>
-      <defs>
-        <linearGradient id="mg" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor="#E8594A"/><stop offset="100%" stopColor="#C0392B"/></linearGradient>
-        <linearGradient id="dg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#B03A2E"/><stop offset="100%" stopColor="#922B21"/></linearGradient>
-        <pattern id="fib" width="3" height="3" patternUnits="userSpaceOnUse" patternTransform="rotate(30)">
-          <line x1="0" y1="0" x2="0" y2="3" stroke="rgba(120,30,10,0.12)" strokeWidth="0.6"/>
-        </pattern>
-        <filter id="glow"><feGaussianBlur stdDeviation="3" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-      </defs>
+      <SvgDefs/>
 
       {/* ===== BODY SKIN BACKGROUND ===== */}
       <ellipse cx="150" cy="36" rx="27" ry="31" fill="#F0C8A8" stroke="#D4A574" strokeWidth="1"/>
@@ -446,22 +475,350 @@ function BodySVG({ activeRegion, onSelectRegion, activeItem, activeTab }) {
   );
 }
 
+/* ==================== BACK VIEW ==================== */
+function BodySVGBack({ activeRegion, onSelectRegion, activeItem, activeTab }) {
+  const { S, mo, bs, boneActive, hi } = useBH(activeRegion, activeItem, activeTab);
+  const clk = (r) => () => onSelectRegion(r);
+  return (
+    <svg viewBox="0 0 300 640" style={{ width:"100%", maxWidth:280, margin:"0 auto", display:"block" }}>
+      <SvgDefs/>
+      {/* Body skin background (back) */}
+      <ellipse cx="150" cy="36" rx="27" ry="31" fill="#F0C8A8" stroke="#D4A574" strokeWidth="1"/>
+      <rect x="132" y="64" width="36" height="30" rx="10" fill="#F0C8A8"/>
+      <path d="M74,108 L226,108 Q232,108 232,114 L224,300 Q218,340 150,345 Q82,340 76,300 L68,114 Q68,108 74,108 Z" fill="#F0C8A8"/>
+      <path d="M68,108 C54,116 46,135 46,160 L40,232 C38,248 36,268 34,290 L30,328 C28,342 26,358 30,365 C36,374 46,370 48,358 L52,328 C54,308 56,288 58,268 L64,232 C66,216 68,196 70,176 Z" fill="#F0C8A8"/>
+      <path d="M232,108 C246,116 254,135 254,160 L260,232 C262,248 264,268 266,290 L270,328 C272,342 274,358 270,365 C264,374 254,370 252,358 L248,328 C246,308 244,288 242,268 L236,232 C234,216 232,196 230,176 Z" fill="#F0C8A8"/>
+      <path d="M96,300 C90,335 86,360 86,380 L84,460 C82,470 84,480 88,492 L94,575 C96,588 94,598 98,610 L128,618 L148,616 L148,300 Z" fill="#F0C8A8"/>
+      <path d="M204,300 C210,335 214,360 214,380 L216,460 C218,470 216,480 212,492 L206,575 C204,588 206,598 202,610 L172,618 L152,616 L152,300 Z" fill="#F0C8A8"/>
+      <path d="M98,608 C92,612 86,618 90,624 L130,628 C136,626 134,614 130,610 Z" fill="#F0C8A8"/>
+      <path d="M202,608 C208,612 214,618 210,624 L170,628 C164,626 166,614 170,610 Z" fill="#F0C8A8"/>
+      {/* Back of head */}
+      <path d="M128,20 Q150,8 172,20 Q178,30 176,45 L124,45 Q122,30 128,20 Z" fill="#8B6914" opacity="0.3"/>
+      <ellipse cx="122" cy="36" rx="5" ry="8" fill="#F0C8A8" stroke="#D4A574" strokeWidth="0.8"/>
+      <ellipse cx="178" cy="36" rx="5" ry="8" fill="#F0C8A8" stroke="#D4A574" strokeWidth="0.8"/>
+
+      {/* NECK back */}
+      <g onClick={clk("neck")}>
+        <path d="M136,68 C132,76 128,86 130,96 L140,96 C140,86 140,78 138,70 Z" style={S("neck","板状筋","#B5382E")}/>
+        <path d="M164,68 C168,76 172,86 170,96 L160,96 C160,86 160,78 162,70 Z" style={S("neck","板状筋","#B5382E")}/>
+        <path d="M140,70 L160,70 L158,94 L142,94 Z" style={S("neck","半棘筋","#A0302A")}/>
+      </g>
+
+      {/* UPPER back */}
+      <g onClick={clk("upper")}>
+        {/* Trapezius full */}
+        <path d="M150,68 C125,78 88,98 74,112 L78,120 L86,168 C105,152 135,136 150,130 C165,136 195,152 214,168 L222,120 L226,112 C212,98 175,78 150,68 Z" style={S("upper","僧帽筋","#D4453B")}/>
+        {/* Spine line through trap */}
+        <line x1="150" y1="68" x2="150" y2="168" stroke="rgba(120,30,10,0.2)" strokeWidth="1.5" style={{opacity:mo("upper"),pointerEvents:"none"}}/>
+
+        {/* Infraspinatus left */}
+        <path d="M100,122 C94,132 90,148 94,162 L116,162 C118,148 114,132 108,122 Z" style={S("upper","棘下筋","#C9453A")}/>
+        <path d="M200,122 C206,132 210,148 206,162 L184,162 C182,148 186,132 192,122 Z" style={S("upper","棘下筋","#C9453A")}/>
+
+        {/* Teres minor */}
+        <path d="M90,163 C86,170 84,178 88,184 L104,178 C104,172 98,165 94,163 Z" style={S("upper","小円筋","#BA3A30")}/>
+        <path d="M210,163 C214,170 216,178 212,184 L196,178 C196,172 202,165 206,163 Z" style={S("upper","小円筋","#BA3A30")}/>
+
+        {/* Teres major */}
+        <path d="M86,185 C80,194 78,204 82,210 L100,204 C98,196 94,188 90,185 Z" style={S("upper","大円筋","#B03A2E")}/>
+        <path d="M214,185 C220,194 222,204 218,210 L200,204 C202,196 206,188 210,185 Z" style={S("upper","大円筋","#B03A2E")}/>
+
+        {/* Latissimus dorsi */}
+        <path d="M82,210 C78,235 76,265 80,290 L96,298 C94,265 92,235 90,215 Z" style={S("upper","広背筋","#A0302A")}/>
+        <path d="M218,210 C222,235 224,265 220,290 L204,298 C206,265 208,235 210,215 Z" style={S("upper","広背筋","#A0302A")}/>
+
+        {/* Rhomboids */}
+        <path d="M140,118 C134,128 128,145 130,165 L140,165 C142,145 142,130 144,120 Z" style={S("upper","菱形筋","#B5382E")}/>
+        <path d="M160,118 C166,128 172,145 170,165 L160,165 C158,145 158,130 156,120 Z" style={S("upper","菱形筋","#B5382E")}/>
+
+        {/* Deltoid posterior */}
+        <path d="M74,112 C64,120 56,138 58,158 C60,164 64,166 68,162 L78,132 Z" style={S("upper","三角筋","#E05A4B")}/>
+        <path d="M226,112 C236,120 244,138 242,158 C240,164 236,166 232,162 L222,132 Z" style={S("upper","三角筋","#E05A4B")}/>
+
+        {/* Triceps */}
+        <path d="M60,160 C54,178 48,208 46,232 C44,242 48,246 54,244 C58,236 62,215 66,192 C68,178 66,166 64,160 Z" style={S("upper","上腕三頭筋","#C9453A")}/>
+        <path d="M240,160 C246,178 252,208 254,232 C256,242 252,246 246,244 C242,236 238,215 234,192 C232,178 234,166 236,160 Z" style={S("upper","上腕三頭筋","#C9453A")}/>
+
+        {/* Forearm back */}
+        <path d="M46,244 C42,262 38,292 36,320 C34,334 32,350 36,360 C40,368 48,364 50,354 L52,332 C54,310 56,288 58,264 L60,246 Z" style={S("upper","前腕屈筋群","#C9453A")}/>
+        <path d="M254,244 C258,262 262,292 264,320 C266,334 268,350 264,360 C260,368 252,364 250,354 L248,332 C246,310 244,288 242,264 L240,246 Z" style={S("upper","前腕屈筋群","#C9453A")}/>
+      </g>
+
+      {/* CORE back */}
+      <g onClick={clk("core")}>
+        {/* Erector spinae left */}
+        <path d="M138,170 C136,210 136,250 138,290 L146,290 C148,250 148,210 146,170 Z" style={S("core","脊柱起立筋","#C0392B")}/>
+        <path d="M154,170 C152,210 152,250 154,290 L162,290 C164,250 164,210 162,170 Z" style={S("core","脊柱起立筋","#C0392B")}/>
+        {/* Multifidus (deep, semi-transparent) */}
+        <path d="M146,180 L154,180 L154,285 L146,285 Z" style={{...S("core","多裂筋","#922B21"), opacity: hi("core") ? 0.5 : 0.15}}/>
+        {/* Spine center line */}
+        <line x1="150" y1="170" x2="150" y2="295" stroke="rgba(245,203,167,0.6)" strokeWidth="2" style={{opacity:mo("core"),pointerEvents:"none"}}/>
+      </g>
+
+      {/* HIP back */}
+      <g onClick={clk("hip")}>
+        {/* Gluteus maximus */}
+        <path d="M84,296 C78,315 80,345 90,365 C98,378 115,382 130,374 C140,366 146,350 148,335 L148,296 C128,290 106,288 84,296 Z" style={S("hip","大臀筋","#D4453B")}/>
+        <path d="M216,296 C222,315 220,345 210,365 C202,378 185,382 170,374 C160,366 154,350 152,335 L152,296 C172,290 194,288 216,296 Z" style={S("hip","大臀筋","#D4453B")}/>
+        {/* Glute med */}
+        <path d="M82,282 C78,290 80,298 86,296 L96,296 C92,290 88,284 84,282 Z" style={S("hip","中臀筋","#BA3A30")}/>
+        <path d="M218,282 C222,290 220,298 214,296 L204,296 C208,290 212,284 216,282 Z" style={S("hip","中臀筋","#BA3A30")}/>
+        {/* Piriformis (deep) */}
+        <path d="M148,310 C138,315 122,322 114,330 L118,336 C128,328 140,320 148,316 Z" style={{...S("hip","梨状筋","#A0302A"), opacity: hi("hip") ? 0.5 : 0.15}}/>
+        <path d="M152,310 C162,315 178,322 186,330 L182,336 C172,328 160,320 152,316 Z" style={{...S("hip","梨状筋","#A0302A"), opacity: hi("hip") ? 0.5 : 0.15}}/>
+      </g>
+
+      {/* THIGH back (hamstrings) */}
+      <g onClick={clk("thigh")}>
+        {/* Biceps femoris (outer) */}
+        <path d="M86,368 C82,395 82,425 86,450 C90,460 98,466 106,468 L114,462 C110,450 108,430 108,405 C108,385 110,372 112,365 Z" style={S("thigh","大腿二頭筋","#C0392B")}/>
+        <path d="M214,368 C218,395 218,425 214,450 C210,460 202,466 194,468 L186,462 C190,450 192,430 192,405 C192,385 190,372 188,365 Z" style={S("thigh","大腿二頭筋","#C0392B")}/>
+        {/* Semitendinosus (middle) */}
+        <path d="M114,365 C112,390 112,420 114,448 C116,458 122,466 128,468 L134,462 C130,450 128,428 128,405 C128,385 130,372 132,366 Z" style={S("thigh","半腱様筋","#D4453B")}/>
+        <path d="M186,365 C188,390 188,420 186,448 C184,458 178,466 172,468 L166,462 C170,450 172,428 172,405 C172,385 170,372 168,366 Z" style={S("thigh","半腱様筋","#D4453B")}/>
+        {/* Semimembranosus (inner) */}
+        <path d="M134,368 C136,392 138,420 136,448 C134,458 130,464 126,466 L120,460 C124,450 126,430 126,408 C126,388 126,375 128,368 Z" style={S("thigh","半膜様筋","#BA3A30")}/>
+        <path d="M166,368 C164,392 162,420 164,448 C166,458 170,464 174,466 L180,460 C176,450 174,430 174,408 C174,388 174,375 172,368 Z" style={S("thigh","半膜様筋","#BA3A30")}/>
+        {/* Knee back */}
+        <ellipse cx="118" cy="470" rx="16" ry="8" fill="#F5CBA7" stroke="#D4A574" strokeWidth="0.8" style={{opacity:mo("thigh")}}/>
+        <ellipse cx="182" cy="470" rx="16" ry="8" fill="#F5CBA7" stroke="#D4A574" strokeWidth="0.8" style={{opacity:mo("thigh")}}/>
+      </g>
+
+      {/* FOOT back (calves) */}
+      <g onClick={clk("foot")}>
+        {/* Gastrocnemius medial head left */}
+        <path d="M104,476 C98,496 96,525 100,555 C102,565 110,572 118,568 C122,558 122,530 118,500 C116,488 110,478 108,476 Z" style={S("foot","腓腹筋","#D4453B")}/>
+        <path d="M196,476 C202,496 204,525 200,555 C198,565 190,572 182,568 C178,558 178,530 182,500 C184,488 190,478 192,476 Z" style={S("foot","腓腹筋","#D4453B")}/>
+        {/* Gastrocnemius lateral head */}
+        <path d="M92,478 C88,496 86,522 90,548 C92,558 98,562 104,558 C106,548 106,525 104,500 C102,488 98,480 96,478 Z" style={S("foot","腓腹筋","#C9453A")}/>
+        <path d="M208,478 C212,496 214,522 210,548 C208,558 202,562 196,558 C194,548 194,525 196,500 C198,488 202,480 204,478 Z" style={S("foot","腓腹筋","#C9453A")}/>
+        {/* Soleus */}
+        <path d="M98,555 C100,565 106,574 112,576 L110,570 C106,564 102,558 100,555 Z" style={S("foot","ヒラメ筋","#A0302A")}/>
+        <path d="M202,555 C200,565 194,574 188,576 L190,570 C194,564 198,558 200,555 Z" style={S("foot","ヒラメ筋","#A0302A")}/>
+        {/* Posterior tibialis */}
+        <path d="M110,508 C108,528 108,550 110,568 L114,566 C116,548 116,528 114,508 Z" style={S("foot","後脛骨筋","#B5382E")}/>
+        <path d="M190,508 C192,528 192,550 190,568 L186,566 C184,548 184,528 186,508 Z" style={S("foot","後脛骨筋","#B5382E")}/>
+        {/* Achilles */}
+        <path d="M108,574 L110,594 L106,594 L104,574 Z" fill="#F5CBA7" stroke="#D4A574" strokeWidth="0.5" style={{opacity:mo("foot")}}/>
+        <path d="M192,574 L190,594 L194,594 L196,574 Z" fill="#F5CBA7" stroke="#D4A574" strokeWidth="0.5" style={{opacity:mo("foot")}}/>
+        {/* Foot back */}
+        <path d="M98,608 C92,612 86,618 90,624 L128,628 C134,624 132,616 128,610 Z" style={S("foot","足底筋群","#C9453A")}/>
+        <path d="M202,608 C208,612 214,618 210,624 L172,628 C166,624 168,616 172,610 Z" style={S("foot","足底筋群","#C9453A")}/>
+        {/* Long flexors */}
+        <path d="M106,530 C104,548 104,565 106,572 L110,570 C112,562 112,548 110,530 Z" style={S("foot","長趾屈筋","#A0302A")}/>
+        <path d="M194,530 C196,548 196,565 194,572 L190,570 C188,562 188,548 190,530 Z" style={S("foot","長趾屈筋","#A0302A")}/>
+      </g>
+
+      {/* Bone overlay back */}
+      {activeTab === "bones" && <g>
+        <path d="M150,68 L150,320" style={bs("椎")}/>
+        {[72,78,84,90].map((y,i)=><circle key={`cv${i}`} cx="150" cy={y} r={boneActive("頸椎")?3:1.5} fill={boneActive("頸椎")?"white":"rgba(255,255,255,0.5)"} style={{transition:"all 0.3s"}}/>)}
+        {[100,115,130,145,160,175,190].map((y,i)=><circle key={`tv${i}`} cx="150" cy={y} r={boneActive("胸椎")?2.5:1.2} fill={boneActive("胸椎")?"white":"rgba(255,255,255,0.4)"} style={{transition:"all 0.3s"}}/>)}
+        {[210,230,250,270,285].map((y,i)=><circle key={`lv${i}`} cx="150" cy={y} r={boneActive("腰椎")?3:1.5} fill={boneActive("腰椎")?"white":"rgba(255,255,255,0.4)"} style={{transition:"all 0.3s"}}/>)}
+        <path d="M144,295 L156,295 L152,320 L148,320 Z" style={bs("仙骨")}/>
+        {/* Scapulae */}
+        <path d="M118,110 L96,120 L92,165 L120,168 L130,135 Z" style={bs("肩甲骨")}/>
+        <path d="M182,110 L204,120 L208,165 L180,168 L170,135 Z" style={bs("肩甲骨")}/>
+        <path d="M92,286 Q120,275 150,280 Q180,275 208,286 L212,310 Q200,330 150,335 Q100,330 88,310 Z" style={bs("骨盤")}/>
+        <path d="M108,340 L116,455" style={bs("大腿骨")}/>
+        <path d="M192,340 L184,455" style={bs("大腿骨")}/>
+        <path d="M116,478 L112,580" style={bs("脛骨")}/>
+        <path d="M184,478 L188,580" style={bs("脛骨")}/>
+        <path d="M72,112 L50,235" style={bs("上腕骨")}/>
+        <path d="M228,112 L250,235" style={bs("上腕骨")}/>
+      </g>}
+
+      <rect x="0" y="0" width="300" height="640" fill="url(#fib)" opacity="0.3" pointerEvents="none"/>
+      <text x="150" y="82" textAnchor="middle" fontSize="7" fill="white" fontWeight="bold" style={{opacity:hi("neck")?0.9:0.2,pointerEvents:"none"}}>首</text>
+      <text x="150" y="148" textAnchor="middle" fontSize="8" fill="white" fontWeight="bold" style={{opacity:hi("upper")?0.9:0.2,pointerEvents:"none"}}>背中</text>
+      <text x="150" y="240" textAnchor="middle" fontSize="8" fill="white" fontWeight="bold" style={{opacity:hi("core")?0.9:0.2,pointerEvents:"none"}}>脊柱</text>
+      <text x="150" y="340" textAnchor="middle" fontSize="7" fill="white" fontWeight="bold" style={{opacity:hi("hip")?0.9:0.2,pointerEvents:"none"}}>臀部</text>
+      <text x="118" y="420" textAnchor="middle" fontSize="7" fill="white" fontWeight="bold" style={{opacity:hi("thigh")?0.9:0.2,pointerEvents:"none"}}>ハム</text>
+      <text x="110" y="535" textAnchor="middle" fontSize="7" fill="white" fontWeight="bold" style={{opacity:hi("foot")?0.8:0.2,pointerEvents:"none"}}>ふくらはぎ</text>
+    </svg>
+  );
+}
+
+/* ==================== SIDE VIEW ==================== */
+function BodySVGSide({ activeRegion, onSelectRegion, activeItem, activeTab }) {
+  const { S, mo, bs, boneActive, hi } = useBH(activeRegion, activeItem, activeTab);
+  const clk = (r) => () => onSelectRegion(r);
+  return (
+    <svg viewBox="0 0 300 640" style={{ width:"100%", maxWidth:280, margin:"0 auto", display:"block" }}>
+      <SvgDefs/>
+      {/* Side body silhouette (facing right) */}
+      <ellipse cx="155" cy="36" rx="28" ry="31" fill="#F0C8A8" stroke="#D4A574" strokeWidth="1"/>
+      {/* Nose */}
+      <path d="M183,32 C186,36 185,42 182,44" fill="none" stroke="#D4A574" strokeWidth="1.2"/>
+      {/* Eye */}
+      <circle cx="168" cy="30" r="2.5" fill="#6B4226"/>
+      {/* Ear */}
+      <ellipse cx="132" cy="36" rx="5" ry="8" fill="#F0C8A8" stroke="#D4A574" strokeWidth="0.8"/>
+      {/* Neck */}
+      <rect x="140" y="64" width="30" height="30" rx="8" fill="#F0C8A8"/>
+      {/* Torso side */}
+      <path d="M125,94 C120,100 115,120 115,160 L112,200 C110,240 112,270 118,300 L180,300 C186,270 188,240 186,200 L184,160 C184,120 180,100 175,94 Z" fill="#F0C8A8"/>
+      {/* Arm */}
+      <path d="M178,100 C192,110 200,130 198,160 L200,232 C202,260 204,290 202,320 C200,340 196,355 190,358 C184,360 180,352 182,340 L184,310 C186,285 184,260 182,235 L180,200 C178,180 178,160 180,140 Z" fill="#F0C8A8"/>
+      {/* Leg */}
+      <path d="M118,300 C112,330 110,360 112,395 L114,460 C112,475 114,490 118,500 L124,575 C126,590 124,600 128,612 L170,618 L170,612 C166,600 168,590 166,575 L160,500 C156,490 154,475 156,460 L158,395 C160,360 162,330 164,300 Z" fill="#F0C8A8"/>
+      {/* Foot */}
+      <path d="M126,610 C120,614 116,620 120,626 L172,628 C178,624 176,616 172,612 Z" fill="#F0C8A8"/>
+
+      {/* NECK side */}
+      <g onClick={clk("neck")}>
+        <path d="M142,66 C138,74 134,84 136,94 L146,94 C146,84 146,76 144,68 Z" style={S("neck","肩甲挙筋","#C9453A")}/>
+        <path d="M148,66 C152,72 158,80 160,92 L154,94 C152,82 150,74 148,68 Z" style={S("neck","胸鎖乳突筋","#D4453B")}/>
+      </g>
+
+      {/* UPPER side */}
+      <g onClick={clk("upper")}>
+        {/* Deltoid side */}
+        <path d="M176,96 C190,104 198,125 196,148 C194,156 190,158 186,154 C184,142 182,125 178,110 Z" style={S("upper","三角筋","#E05A4B")}/>
+        {/* Pec edge */}
+        <path d="M170,110 C176,115 182,130 180,150 L172,148 C174,132 172,118 170,112 Z" style={S("upper","大胸筋","#D4453B")}/>
+        {/* Serratus */}
+        {[140,152,164,176].map((y,i)=><path key={`ss${i}`} d={`M${120+i},${y} L${130+i},${y+2} L${128+i},${y+10} L${118+i},${y+8} Z`} style={S("upper","前鋸筋","#BA3A30")}/>)}
+        {/* Lat edge */}
+        <path d="M122,170 C118,200 116,240 120,275 L128,278 C126,245 124,210 126,175 Z" style={S("upper","広背筋","#A0302A")}/>
+        {/* Bicep */}
+        <path d="M188,152 C192,168 194,195 192,222 C190,232 186,235 184,230 C182,218 180,195 182,172 C183,162 186,155 188,152 Z" style={S("upper","上腕二頭筋","#D94F42")}/>
+        {/* Tricep */}
+        <path d="M184,154 C180,170 178,198 180,226 C182,234 186,236 188,230 L190,224 C192,200 190,175 186,158 Z" style={S("upper","上腕三頭筋","#B5382E")}/>
+      </g>
+
+      {/* CORE side */}
+      <g onClick={clk("core")}>
+        {/* External oblique */}
+        <path d="M126,195 C122,220 120,250 122,280 L132,282 C130,252 130,222 132,198 Z" style={S("core","外腹斜筋","#C0392B")}/>
+        {/* Internal oblique */}
+        <path d="M132,200 C130,225 128,255 130,282 L140,284 C138,256 138,228 140,202 Z" style={{...S("core","内腹斜筋","#BA3A30"), opacity: hi("core") ? 0.7 : 0.2}}/>
+        {/* Rectus edge */}
+        <path d="M160,195 C164,220 166,255 164,288 L158,290 C156,258 154,225 156,198 Z" style={S("core","腹直筋","#D4453B")}/>
+        {/* TVA (deep, semi-transparent wrap) */}
+        <path d="M118,210 L172,210 L170,280 L116,280 Z" style={{fill:"rgba(160,48,42,0.15)", stroke:"#A0302A", strokeWidth:1, strokeDasharray:"4,3", opacity: hi("core") ? 0.5 : 0.1, pointerEvents:"none"}}/>
+        <text x="145" y="248" textAnchor="middle" fontSize="6" fill="#A0302A" style={{opacity: hi("core") ? 0.6 : 0.1}}>TVA</text>
+        {/* Diaphragm schematic */}
+        <path d="M118,192 Q148,172 178,192" fill="none" stroke={boneActive("横隔膜")||activeItem?.name?.includes("横隔膜")?"#FFD54F":"#D4453B"} strokeWidth="2" strokeDasharray="3,2" style={{opacity: hi("core") ? 0.7 : 0.2}}/>
+        <text x="148" y="186" textAnchor="middle" fontSize="5" fill="#D4453B" style={{opacity: hi("core") ? 0.5 : 0.1}}>横隔膜</text>
+        {/* QL */}
+        <path d="M122,198 L120,278 L128,280 L130,200 Z" style={S("core","腰方形筋","#922B21")}/>
+        {/* Psoas / Iliopsoas (deep) */}
+        <path d="M148,218 C146,245 142,275 138,305 C135,325 134,345 136,360 L144,360 C142,342 142,322 144,302 C148,272 150,242 152,220 Z" style={{...S("core","腸腰筋","#B03A2E"), opacity: hi("core") ? 0.5 : 0.15}}/>
+        <text x="142" y="310" textAnchor="middle" fontSize="5" fill="white" style={{opacity: hi("core") ? 0.5 : 0.1}}>腸腰筋</text>
+        {/* Pelvic floor schematic */}
+        <path d="M128,328 Q148,340 168,328" fill="none" stroke={activeItem?.name?.includes("骨盤底")?"#FFD54F":"#D4453B"} strokeWidth="2" strokeDasharray="3,2" style={{opacity: hi("core") ? 0.6 : 0.15}}/>
+        {/* Intercostals */}
+        {[120,135,150,165,178].map((y,i)=><line key={`ic${i}`} x1="120" y1={y} x2="175" y2={y} stroke={activeItem?.name?.includes("肋間")?"#FFD54F":"rgba(120,30,10,0.25)"} strokeWidth={activeItem?.name?.includes("肋間")?1.5:0.6} style={{opacity:mo("core"),pointerEvents:"none"}}/>)}
+      </g>
+
+      {/* HIP side */}
+      <g onClick={clk("hip")}>
+        {/* TFL + IT band */}
+        <path d="M116,292 C112,310 112,340 116,370 L124,372 C122,342 122,312 124,296 Z" style={S("hip","大腿筋膜張筋","#D4453B")}/>
+        <path d="M116,370 L118,460 L124,460 L124,372 Z" style={{fill:"#F5CBA7",stroke:"#D4A574",strokeWidth:0.6,opacity:mo("hip")}}/>
+        {/* Glute med (side, upper) */}
+        <path d="M118,284 C114,292 114,302 118,308 L128,306 C128,298 126,290 124,286 Z" style={S("hip","中臀筋","#C9453A")}/>
+        {/* Small gluteus */}
+        <path d="M120,296 C116,302 116,310 120,316 L128,314 C128,308 126,300 124,298 Z" style={{...S("hip","小臀筋","#BA3A30"), opacity: hi("hip") ? 0.5 : 0.15}}/>
+      </g>
+
+      {/* THIGH side */}
+      <g onClick={clk("thigh")}>
+        {/* Quad profile */}
+        <path d="M156,340 C162,370 164,405 162,440 C160,455 156,462 150,464 L144,460 C146,448 148,420 148,395 C148,370 148,350 150,340 Z" style={S("thigh","大腿直筋","#D4453B")}/>
+        {/* Vastus lat profile */}
+        <path d="M118,345 C114,370 114,405 118,440 C120,455 126,462 132,464 L138,460 C134,448 132,420 132,400 C132,375 134,355 136,345 Z" style={S("thigh","外側広筋","#C0392B")}/>
+        {/* Adductor magnus */}
+        <path d="M152,345 C156,370 158,400 156,435 C154,450 150,460 146,462 L140,458 C144,448 146,425 146,405 C146,380 146,358 148,345 Z" style={S("thigh","大内転筋","#B03A2E")}/>
+        {/* Gracilis */}
+        <path d="M158,350 C160,375 160,410 158,445 C156,455 154,460 150,462 L148,458 C152,448 154,415 154,390 C154,368 154,355 156,350 Z" style={S("thigh","薄筋","#A0302A")}/>
+        <ellipse cx="142" cy="468" rx="16" ry="8" fill="#F5CBA7" stroke="#D4A574" strokeWidth="0.8" style={{opacity:mo("thigh")}}/>
+      </g>
+
+      {/* FOOT side */}
+      <g onClick={clk("foot")}>
+        <path d="M134,478 C130,498 128,525 132,558 C134,568 140,574 146,570 C148,558 148,530 146,502 C144,488 140,480 138,478 Z" style={S("foot","腓腹筋","#C9453A")}/>
+        <path d="M126,480 C122,500 120,530 124,558 C126,565 130,568 134,564 C134,548 134,525 132,502 C130,490 128,482 128,480 Z" style={S("foot","長腓骨筋","#BA3A30")}/>
+        <path d="M148,480 C152,498 154,525 152,555 C150,565 146,568 144,564 C142,550 142,528 144,502 C146,490 148,482 148,480 Z" style={S("foot","前脛骨筋","#D4453B")}/>
+        <path d="M132,560 C134,568 140,576 146,578 L144,572 C140,566 136,562 134,560 Z" style={S("foot","ヒラメ筋","#A0302A")}/>
+        <path d="M140,576 L142,596 L138,596 L136,576 Z" fill="#F5CBA7" stroke="#D4A574" strokeWidth="0.5" style={{opacity:mo("foot")}}/>
+        <path d="M128,610 C122,614 118,620 122,626 L172,628 C178,624 176,616 172,612 Z" style={S("foot","足底筋群","#C9453A")}/>
+      </g>
+
+      {/* Bone overlay side */}
+      {activeTab === "bones" && <g>
+        {/* Spine with curves */}
+        <path d="M150,68 C148,80 146,90 148,100 C150,120 152,140 150,160 C146,180 142,200 144,220 C146,250 148,270 146,290 L148,320" style={bs("椎")}/>
+        {/* Ribs side */}
+        {[108,122,136,150,164,178].map((y,i)=><path key={`rs${i}`} d={`M${148-i},${y} Q${160},${y+6} ${178+i},${y+2}`} style={bs("肋骨")}/>)}
+        {/* Pelvis side */}
+        <path d="M120,280 Q145,270 170,285 L168,320 Q148,335 128,320 Z" style={bs("骨盤")}/>
+        {/* Femur */}
+        <path d="M140,340 L142,458" style={bs("大腿骨")}/>
+        <path d="M142,478 L138,580" style={bs("脛骨")}/>
+        <path d="M184,100 L194,232" style={bs("上腕骨")}/>
+        {/* Scapula side */}
+        <path d="M126,105 L120,165 L135,160 L140,110 Z" style={bs("肩甲骨")}/>
+      </g>}
+
+      <rect x="0" y="0" width="300" height="640" fill="url(#fib)" opacity="0.3" pointerEvents="none"/>
+      <text x="148" y="82" textAnchor="middle" fontSize="7" fill="white" fontWeight="bold" style={{opacity:hi("neck")?0.9:0.2,pointerEvents:"none"}}>首</text>
+      <text x="160" y="135" textAnchor="middle" fontSize="7" fill="white" fontWeight="bold" style={{opacity:hi("upper")?0.9:0.2,pointerEvents:"none"}}>肩</text>
+      <text x="148" y="250" textAnchor="middle" fontSize="7" fill="white" fontWeight="bold" style={{opacity:hi("core")?0.9:0.2,pointerEvents:"none"}}>コア</text>
+      <text x="130" y="310" textAnchor="middle" fontSize="7" fill="white" fontWeight="bold" style={{opacity:hi("hip")?0.9:0.2,pointerEvents:"none"}}>股関節</text>
+      <text x="140" y="405" textAnchor="middle" fontSize="7" fill="white" fontWeight="bold" style={{opacity:hi("thigh")?0.9:0.2,pointerEvents:"none"}}>太もも</text>
+      <text x="140" y="535" textAnchor="middle" fontSize="7" fill="white" fontWeight="bold" style={{opacity:hi("foot")?0.8:0.2,pointerEvents:"none"}}>下腿</text>
+    </svg>
+  );
+}
+
+/* ==================== BODY SVG WRAPPER ==================== */
+function BodySVG({ view, ...props }) {
+  if (view === "back") return <BodySVGBack {...props}/>;
+  if (view === "side") return <BodySVGSide {...props}/>;
+  return <BodySVGFront {...props}/>;
+}
+
 /* ==================== LEARN VIEW ==================== */
 function LearnView() {
   const [selected, setSelected] = useState(null);
   const [tab, setTab] = useState("muscles");
   const [openIdx, setOpenIdx] = useState(null);
+  const [bodyView, setBodyView] = useState("front");
   const d = selected ? REGIONS[selected] : null;
   const activeItem = d && openIdx !== null ? (tab === "muscles" ? d.muscles[openIdx] : tab === "bones" ? d.bones[openIdx] : null) : null;
+
+  useEffect(() => {
+    if (tab === "muscles" && d && openIdx !== null) {
+      const muscle = d.muscles[openIdx];
+      if (muscle) { const v = getViewForMuscle(muscle.name); setBodyView(v); }
+    }
+  }, [openIdx, tab, d]);
+
   const regionList = [
     {id:"neck",label:"首・頸部"},{id:"upper",label:"上半身・肩"},
     {id:"core",label:"体幹・コア"},{id:"hip",label:"股関節・骨盤底"},
     {id:"thigh",label:"太もも・膝"},{id:"foot",label:"下腿・足首・足"},
   ];
+  const viewBtns = [["front","前面"],["side","側面"],["back","背面"]];
   return (
     <div>
       <p style={{textAlign:"center",color:"#999",fontSize:12,marginBottom:6}}>部位をタップして学ぼう</p>
+      {/* View toggle */}
+      <div style={{display:"flex",justifyContent:"center",gap:4,marginBottom:8}}>
+        {viewBtns.map(([v,label])=>(
+          <button key={v} onClick={()=>setBodyView(v)}
+            style={{padding:"6px 18px",borderRadius:20,border:"1.5px solid #764ba2",
+              background:bodyView===v?"linear-gradient(135deg,#667eea,#764ba2)":"white",
+              color:bodyView===v?"white":"#764ba2",fontSize:12,fontWeight:"bold",cursor:"pointer",
+              transition:"all 0.2s"}}>
+            {label}
+          </button>
+        ))}
+      </div>
       <BodySVG
+        view={bodyView}
         activeRegion={selected}
         onSelectRegion={id=>{setSelected(id===selected?null:id);setTab("muscles");setOpenIdx(null);}}
         activeItem={activeItem}
@@ -502,6 +859,12 @@ function LearnView() {
                 <div style={{padding:"10px 14px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
                   <span style={{fontWeight:"bold",color:openIdx===i?d.color:"#333",fontSize:13}}>
                     {tab==="muscles"?"💪 ":"🦴 "}{item.name}
+                    {tab==="muscles"&&getViewForMuscle(item.name)!=="front"&&
+                      <span style={{fontSize:9,marginLeft:4,padding:"1px 5px",borderRadius:8,
+                        background:getViewForMuscle(item.name)==="back"?"#EDE7F6":"#E3F2FD",
+                        color:getViewForMuscle(item.name)==="back"?"#764ba2":"#1E88E5"}}>
+                        {getViewForMuscle(item.name)==="back"?"背面":"側面"}
+                      </span>}
                   </span>
                   <span style={{color:d.color,fontSize:14}}>{openIdx===i?"▲":"▼"}</span>
                 </div>
