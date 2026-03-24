@@ -146,10 +146,7 @@ const REGIONS = {
     pilates: ["フットワーク（ポイント・フレックス・ハーフトゥ）", "カーフレイズ", "アンクルサークル", "リフォーマー：フットバーへの押し出し全種", "キャデラック：フットプレス", "バランスボード・フットコレクション"],
   },
 };
-const quizPool = Object.entries(REGIONS).flatMap(([, d]) => [
-  ...d.bones.map(b => ({ type: "骨", region: d.label, color: d.color, light: d.light, ...b })),
-  ...d.muscles.map(m => ({ type: "筋肉", region: d.label, color: d.color, light: d.light, ...m })),
-]);
+/* quizPool is now generated dynamically by buildQuizPool() in QuizView */
 function shuffle(arr) { return [...arr].sort(() => Math.random() - 0.5); }
 
 const MUSCLE_VIEW_MAP = {
